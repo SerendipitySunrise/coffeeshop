@@ -1,0 +1,289 @@
+.inventory-management {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+.page-title {
+    color: #e67e22;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 25px;
+}
+.update-stock-btn {
+    background-color: #e67e22;
+    color: #ffffff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+.update-stock-btn:hover {
+    background-color: #d35400;
+}
+.inventory-card {
+    background-color: #2e2e2e;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    margin-bottom: 20px;
+}
+.search-and-filter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+.search-box {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    background-color: #444444;
+    border-radius: 8px;
+    padding: 10px 15px;
+    max-width: 400px;
+}
+.search-box i {
+    color: #a0a0a0;
+    margin-right: 10px;
+}
+.search-box input {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 15px;
+    outline: none;
+}
+.category-filter {
+    position: relative;
+    background-color: #444444;
+    border-radius: 8px;
+}
+.category-filter select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: transparent;
+    border: none;
+    color: #ffffff;
+    padding: 10px 35px 10px 15px;
+    font-size: 15px;
+    cursor: pointer;
+    outline: none;
+    border-radius: 8px;
+    min-width: 150px;
+}
+
+.category-filter select option {
+    color: #000000;
+}
+
+.category-filter i {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #a0a0a0;
+    pointer-events: none;
+    font-size: 12px;
+}
+
+.inventory-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+}
+.inventory-table thead th {
+    color: #a0a0a0;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+    padding: 10px 0;
+    border-bottom: 1px solid #444444;
+}
+.inventory-table tbody .item-row {
+    background-color: #2e2e2e;
+    color: #ffffff;
+    font-size: 15px;
+}
+.inventory-table tbody td {
+    padding: 15px 0;
+    border-bottom: 1px solid #3a3a3a;
+}
+.inventory-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.inventory-table .col-name { width: 30%; }
+.inventory-table .col-status { width: 25%; }
+.stock-toggle {
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+    background-color: #27ae60;
+    border-radius: 10px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+.stock-toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background-color: white;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    transform: translateX(20px);
+}
+.status-badge {
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.status-badge.critical {
+    background-color: #c0392b;
+    color: #ffffff;
+}
+.status-badge.low {
+    background-color: #f39c12;
+    color: #1a1a1a;
+}
+.status-badge.good {
+    background-color: #27ae60;
+    color: #ffffff;
+}
+.actions-col {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.low-stock-alerts {
+    background-color: #2e2e2e;
+    color: #e67e22;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+.alerts-title {
+    color: #ffffff;
+    font-size: 14px;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+}
+.low-stock-alerts p {
+    font-size: 16px;
+    color: #e67e22;
+}
+@media (max-width: 992px) {
+    .inventory-card {
+        padding: 15px;
+    }
+    .search-and-filter {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .search-box {
+        max-width: 100%;
+        margin-bottom: 10px;
+    }
+    .table-responsive {
+        overflow-x: auto;
+    }
+}
+/* --- THEME-ADJUSTED STOCK CONTROL STYLES --- */
+
+.stock-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+}
+
+.stock-controls button {
+    /* Use dark background for buttons */
+    background-color: #444444; 
+    /* Use orange accent for button text and border */
+    color: #e67e22;
+    border: 1px solid #e67e22;
+    padding: 5px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.1s, color 0.1s;
+    font-weight: bold;
+}
+
+.stock-controls button:hover {
+    /* Slightly darker hover state */
+    background-color: #555555;
+    color: #ffffff;
+}
+
+.stock-input {
+    /* Match the style of the search input */
+    width: 60px; 
+    text-align: center;
+    padding: 5px;
+    background-color: #444444; /* Dark background */
+    color: #ffffff; /* White text */
+    border: 1px solid #444444; /* Border matches background for clean look */
+    border-radius: 4px;
+    outline: none;
+}
+
+.stock-controls .reset-btn {
+    /* Use the primary theme color for the reset action */
+    padding: 5px 6px;
+    color: #ffffff;
+    background-color: #e67e22;
+    border-color: #e67e22;
+    margin-left: 5px;
+}
+
+.stock-controls .reset-btn:hover {
+    /* Darker orange on hover */
+    background-color: #d35400;
+}
+
+.stock-controls .unit-display {
+    margin-left: 5px;
+    font-size: 0.9em;
+    color: #a0a0a0; /* Light grey text */
+}
+
+.save-all-changes-btn {
+    /* Use the primary theme color for the main action button */
+    display: block;
+    width: 250px;
+    margin: 20px auto;
+    padding: 12px 20px;
+    background-color: #e67e22;
+    color: white;
+    font-weight: bold;
+    border: none;
+    border-radius: 8px; /* Slightly larger border-radius to match other elements */
+    cursor: pointer;
+    transition: background-color 0.2s;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.save-all-changes-btn:hover {
+    background-color: #d35400; /* Darker shade of orange on hover */
+}

@@ -1,0 +1,179 @@
+    /* Global Dark Theme */
+    body { 
+        background-color: #1A1A1A; /* Very dark background */
+        color: #E0E0E0; /* Light gray text */
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    
+    .details-container { 
+        max-width: 1000px; 
+        margin: 50px auto; 
+        padding: 30px; 
+        background-color: #242424; /* Slightly lighter container background */
+        border-radius: 10px; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5); /* Stronger shadow */
+    }
+    
+    /* Header and Title */
+    .order-header { 
+        display: flex; 
+        align-items: center; 
+        margin-bottom: 25px; 
+        border-bottom: 2px solid #333333; /* Separator line */
+        padding-bottom: 15px;
+    }
+    .order-header h1 { 
+        font-size: 1.5em; /* Slightly smaller title */
+        font-weight: 600;
+        color: #F9A825; /* Accent color for the title */
+    }
+
+    /* Status Badges */
+    .order-status-badge { 
+        padding: 6px 12px; 
+        border-radius: 4px; 
+        font-size: 0.9em;
+        font-weight: bold; 
+        margin-left: 20px; 
+        text-transform: uppercase;
+    }
+    .status-new { background-color: #FFC107; color: #333; } /* Yellow for Pending */
+    .status-accepted { background-color: #007BFF; color: white; } /* Blue for Preparing */
+    .status-completed { background-color: #28A745; color: white; } /* Green for Completed */
+    .status-rejected { background-color: #DC3545; color: white; } /* Red for Cancelled */
+
+    /* Cards/Sections */
+    .card-group { 
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 20px; 
+        margin-top: 20px; 
+    }
+    .card { 
+        background-color: #2A2A2A; /* Card background */
+        border-radius: 8px; 
+        padding: 20px; 
+        box-shadow: none; /* Removed internal shadow for cleaner look */
+        border: 1px solid #333333; /* Subtle border */
+        flex: 1 1 calc(50% - 20px); 
+        min-width: 300px; 
+    }
+    .card h3 { 
+        color: #F9A825; /* Accent color for card headings */
+        border-bottom: 1px solid #444444; 
+        padding-bottom: 8px; 
+        margin-top: 0; 
+        font-size: 1.2em;
+        font-weight: 500;
+    }
+    
+    /* Item List */
+    .item-list { list-style: none; padding: 0; }
+    .item-list li { 
+        margin-bottom: 12px; 
+        padding-bottom: 8px; 
+        border-bottom: 1px dotted #444444; /* Dotted separator */
+    }
+    .item-details { 
+        font-size: 0.8em; 
+        color: #AAAAAA; 
+        margin-left: 15px; 
+        margin-top: 2px;
+    }
+
+    /* Totals Section */
+    .total-section { 
+        text-align: right; 
+        font-size: 1em; 
+        margin-top: 15px; 
+        padding-top: 15px;
+        border-top: 1px solid #444444;
+    }
+    .total-section p { margin: 5px 0; }
+    .total-section p:last-of-type { 
+        font-size: 1.8em; 
+        font-weight: bold;
+        color: #F9A825; /* Highlight total price */
+    }
+
+    /* History List */
+    .history-list { list-style: none; padding: 0; }
+    .history-list li { 
+        padding: 8px 0; 
+        border-bottom: 1px dotted #444444; 
+    }
+    .history-list .timestamp { 
+        font-size: 0.8em; 
+        color: #777; 
+        display: block; 
+        margin-top: 2px; 
+    }
+
+    /* Action Buttons (Crucial for image look) */
+    .action-buttons { 
+        display: flex; 
+        justify-content: flex-end; /* Align buttons to the right */
+        gap: 15px; 
+        padding-top: 25px; 
+        border-top: 1px solid #333333; 
+        margin-top: 25px;
+    }
+    .action-buttons form { margin: 0; }
+    .action-buttons button { 
+        padding: 12px 25px; 
+        border: none; 
+        border-radius: 5px; 
+        font-weight: bold; 
+        cursor: pointer; 
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: background-color 0.2s, opacity 0.2s; 
+    }
+
+    /* Button Colors to match Image */
+    .cancel-btn { 
+        background-color: #DC3545; /* Red */
+        color: white; 
+    }
+    .cancel-btn:hover:not(:disabled) { background-color: #C82333; }
+    
+    .ready-btn { 
+        background-color: #007BFF; /* Blue */
+        color: white; 
+    }
+    .ready-btn[style*="background-color: #28a745;"] { /* Specifically for the COMPLETED state (Green) */
+         background-color: #28A745 !important;
+    }
+    .ready-btn:hover:not(:disabled) { background-color: #0056B3; }
+    
+    .disabled-btn { 
+        background-color: #444 !important; 
+        color: #999 !important; 
+        cursor: not-allowed; 
+        opacity: 0.7;
+    }
+    
+    /* Alerts */
+    .alert-box { 
+        padding: 15px; 
+        border-radius: 5px; 
+        margin-bottom: 20px; 
+        font-weight: 500; 
+        font-size: 0.9em;
+    }
+    .alert-success { 
+        background-color: #21432c; 
+        color: #90ee90; 
+        border: 1px solid #3c6a46; 
+    }
+    .alert-error { 
+        background-color: #582f32; 
+        color: #f08080; 
+        border: 1px solid #8d3e42; 
+    }
+    
+    /* Minor Adjustments */
+    p { margin: 8px 0; }
+    hr { border-top: 1px solid #444444; margin: 15px 0; }
+    .item-list span[style="float: right;"] { font-weight: bold; color: #F9A825; }
+    
