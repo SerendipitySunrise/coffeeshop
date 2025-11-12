@@ -120,7 +120,7 @@ $js_lock_expires = isset($_SESSION['login_lock_expires']) ? $_SESSION['login_loc
             </div>
 
             <?php if (!empty($error)): ?>
-                <p style="color: red; text-align:center;"><?php echo $error; ?></p>
+                <p id="error-message" style="color: red; text-align:center;"><?php echo $error; ?></p>
             <?php endif; ?>
 
             <div class="form-group">
@@ -158,6 +158,7 @@ $js_lock_expires = isset($_SESSION['login_lock_expires']) ? $_SESSION['login_loc
         function pad(n) { return n < 10 ? '0' + n : n; }
         const countdownEl = document.getElementById('countdown');
         const loginBtn = document.getElementById('login-btn');
+        const errorMsg = document.getElementById('error-message');
         let timer;
 
         function updateCountdown() {
@@ -165,8 +166,12 @@ $js_lock_expires = isset($_SESSION['login_lock_expires']) ? $_SESSION['login_loc
             let remaining = window.LOGIN_LOCK_EXPIRES - now;
             
             if (remaining <= 0) {
-                // Lock expired: enable button and clear countdown
-                if (countdownEl) countdownEl.textContent = '00m 00s';
+                // Lock expired: enable button and show success message
+                if (errorMsg) {
+                    errorMsg.style.color = 'green';
+                    errorMsg.innerHTML = 'You can now login again. Please try logging in.';
+                }
+                
                 if (loginBtn) {
                     loginBtn.disabled = false;
                     loginBtn.textContent = 'Log In';
