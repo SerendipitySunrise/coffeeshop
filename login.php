@@ -3,9 +3,9 @@
 include('includes/db_connect.php'); 
 session_start(); 
 
-// 2. RATE LIMITING LOGIC
-$max_attempts = 5;
-$lockout_duration = 300; // 5 minutes in seconds
+// 2. RATE LIMITING LOGIC - FIXED VALUES
+$max_attempts = 3;  // Changed from 5 to 3
+$lockout_duration = 120; // Changed from 300 to 120 (2 minutes in seconds)
 
 // initialize login attempts counter if not present
 if (!isset($_SESSION['login_attempts'])) {
@@ -43,7 +43,6 @@ if (isset($_POST['login'])) {
         $password = $_POST['password']; // Plain text password submitted by user
 
         // Use prepared statements for secure querying
-        // --- CHANGE 1: Select the 'role' column from the users table ---
         $stmt = $conn->prepare("SELECT user_id, name, password, role FROM users WHERE email = ?");
         
         if ($stmt) {
@@ -56,7 +55,7 @@ if (isset($_POST['login'])) {
                 $stored_hash = $user['password']; // This is the HASH from the database
                 $user_role = $user['role'];      // Retrieve the user's role
 
-                // --- CRITICAL FIX: Use password_verify() to check the plain password against the hash ---
+                // Use password_verify() to check the plain password against the hash
                 if (password_verify($password, $stored_hash)) {
                     // SUCCESSFUL LOGIN
                     
@@ -69,12 +68,10 @@ if (isset($_POST['login'])) {
                     $_SESSION['name'] = $user['name']; 
                     $_SESSION['role'] = $user_role; // Store the role in the session
                     
-                    // --- CHANGE 2: Conditional Redirect based on role ---
+                    // Conditional Redirect based on role
                     if ($user_role === 'admin') {
-                        // Assuming your admin dashboard is named 'admin_dashboard.php'
                         header('Location: admin/dashboard.php'); 
                     } else {
-                        // Default user dashboard
                         header('Location: index.php'); 
                     }
                     exit(); 
@@ -97,14 +94,13 @@ if (isset($_POST['login'])) {
         // 4. RATE LIMITING CHECK AFTER ATTEMPT
         if ($_SESSION['login_attempts'] >= $max_attempts) {
             $_SESSION['login_lock_expires'] = time() + $lockout_duration;
-            $error = "Too many failed attempts. You are locked out for 5 minutes. Please wait <span id='countdown'>05m 00s</span>.";
+            $error = "Too many failed attempts. You are locked out for 2 minutes. Please wait <span id='countdown'>02m 00s</span>.";
         }
     }
 }
 
 // Pass the lock expiry time to the JavaScript for countdown display
 $js_lock_expires = isset($_SESSION['login_lock_expires']) ? $_SESSION['login_lock_expires'] : 0;
-echo "<script>window.LOGIN_LOCK_EXPIRES = $js_lock_expires;</script>";
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -123,22 +119,8 @@ echo "<script>window.LOGIN_LOCK_EXPIRES = $js_lock_expires;</script>";
                 <p>Login to your account</p>
             </div>
 
-            <?php if (isset($error)): ?>
+            <?php if (!empty($error)): ?>
                 <p style="color: red; text-align:center;"><?php echo $error; ?></p>
-            <?php endif; ?>
-
-            <?php if (isset($blocked) && $blocked): ?>
-                <?php
-                    $remaining = $_SESSION['login_lock_expires'] - time();
-                    if ($remaining < 0) $remaining = 0;
-                    $mins = floor($remaining / 60);
-                    $secs = $remaining % 60;
-                ?>
-                <p id="lock-message" style="color: red; text-align:center;">Try again in <span id="countdown"><?php echo $mins . 'm ' . $secs . 's'; ?></span>.</p>
-                <!-- expose lock expiry to JS in unix timestamp (seconds) -->
-                <script>
-                    window.LOGIN_LOCK_EXPIRES = <?php echo isset($_SESSION['login_lock_expires']) ? (int)$_SESSION['login_lock_expires'] : 0; ?>;
-                </script>
             <?php endif; ?>
 
             <div class="form-group">
@@ -159,7 +141,7 @@ echo "<script>window.LOGIN_LOCK_EXPIRES = $js_lock_expires;</script>";
                 <a href="forgotpassword.php" class="forgot-password">Forgot password?</a>
             </div>
 
-            <button type="submit" name="login" <?php echo (isset($blocked) && $blocked) ? 'disabled' : ''; ?>>Log In</button>
+            <button type="submit" name="login" id="login-btn">Log In</button>
 
             <div class="form-footer">
                 <p>Don't have an account? <a href="signup.php">Sign Up</a></p>
@@ -167,51 +149,48 @@ echo "<script>window.LOGIN_LOCK_EXPIRES = $js_lock_expires;</script>";
         </form>
     </div>
 
+    <script>
+    // Pass the lock expiry timestamp to JavaScript
+    window.LOGIN_LOCK_EXPIRES = <?php echo $js_lock_expires; ?>;
+
+    // If server provided a lock expiry timestamp, run a countdown
+    if (typeof window.LOGIN_LOCK_EXPIRES !== 'undefined' && window.LOGIN_LOCK_EXPIRES > 0) {
+        function pad(n) { return n < 10 ? '0' + n : n; }
+        const countdownEl = document.getElementById('countdown');
+        const loginBtn = document.getElementById('login-btn');
+        let timer;
+
+        function updateCountdown() {
+            const now = Math.floor(Date.now() / 1000);
+            let remaining = window.LOGIN_LOCK_EXPIRES - now;
+            
+            if (remaining <= 0) {
+                // Lock expired: enable button and clear countdown
+                if (countdownEl) countdownEl.textContent = '00m 00s';
+                if (loginBtn) {
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Log In';
+                }
+                if (timer) clearInterval(timer);
+                return;
+            }
+
+            const mins = Math.floor(remaining / 60);
+            const secs = remaining % 60;
+            
+            if (countdownEl) countdownEl.textContent = pad(mins) + 'm ' + pad(secs) + 's';
+            if (loginBtn) {
+                loginBtn.disabled = true;
+                loginBtn.textContent = 'Locked';
+            }
+        }
+
+        // Initialize the countdown on page load if the lock is active
+        if (window.LOGIN_LOCK_EXPIRES > Math.floor(Date.now() / 1000)) {
+            updateCountdown();
+            timer = setInterval(updateCountdown, 1000);
+        }
+    }
+    </script>
 </body>
 </html>
-
-<script>
-// If server provided a lock expiry timestamp, run a countdown
-if (typeof window.LOGIN_LOCK_EXPIRES !== 'undefined' && window.LOGIN_LOCK_EXPIRES > 0) {
-    function pad(n) { return n < 10 ? '0' + n : n; }
-    const countdownEl = document.getElementById('countdown');
-    const loginBtn = document.querySelector('button[name="login"]');
-    let timer;
-
-    function updateCountdown() {
-        // Use a persistent timer reference
-        if (!timer) {
-             timer = setInterval(updateCountdown, 1000);
-        }
-
-        const now = Math.floor(Date.now() / 1000);
-        let remaining = window.LOGIN_LOCK_EXPIRES - now;
-        
-        if (remaining <= 0) {
-            // Lock expired: remove message and enable button
-            if (countdownEl) countdownEl.textContent = '00m 00s';
-            if (loginBtn) {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'LOG IN';
-            }
-            // Update lock message display
-            const lockMsg = document.getElementById('lock-message');
-            if (lockMsg) lockMsg.innerHTML = 'You can try logging in again.';
-
-            clearInterval(timer);
-            return;
-        }
-
-        const mins = Math.floor(remaining / 60);
-        const secs = remaining % 60;
-        
-        if (countdownEl) countdownEl.textContent = pad(mins) + 'm ' + pad(secs) + 's';
-        if (loginBtn) loginBtn.disabled = true;
-    }
-
-    // Initialize the countdown on page load if the lock is active
-    if (window.LOGIN_LOCK_EXPIRES > Math.floor(Date.now() / 1000)) {
-        updateCountdown();
-    }
-}
-</script>
