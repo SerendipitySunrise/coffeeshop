@@ -1,201 +1,308 @@
 <?php 
-// 1. START SESSION AND CONNECT
-include('includes/db_connect.php'); 
+include('../includes/db_connect.php');
 session_start(); 
 
-// 2. RATE LIMITING LOGIC - FIXED VALUES
-$max_attempts = 3;  // Changed from 5 to 3
-$lockout_duration = 120; // Changed from 300 to 120 (2 minutes in seconds)
+// --- 1. Database Logic (FIXED TO SHOW ALL INGREDIENTS) ---
 
-// initialize login attempts counter if not present
-if (!isset($_SESSION['login_attempts'])) {
-    $_SESSION['login_attempts'] = 0;
-}
-// initialize lock expiry
-if (!isset($_SESSION['login_lock_expires'])) {
-    $_SESSION['login_lock_expires'] = 0;
-}
-
-// Variable to hold error message
-$error = '';
-
-// If a lock expiry was set but the time has passed, clear attempts and lock
-if (isset($_SESSION['login_lock_expires']) && $_SESSION['login_lock_expires'] > 0) {
-    if (time() > $_SESSION['login_lock_expires']) {
-        $_SESSION['login_attempts'] = 0;
-        $_SESSION['login_lock_expires'] = 0;
-    }
-}
-
-// 3. HANDLE LOGIN POST REQUEST
-if (isset($_POST['login'])) {
-    $now = time();
-    
-    // Check if user is currently locked out
-    if ($_SESSION['login_lock_expires'] > $now) {
-        $remaining_sec = $_SESSION['login_lock_expires'] - $now;
-        $minutes = floor($remaining_sec / 60);
-        $seconds = $remaining_sec % 60;
-        $error = "Too many login attempts. Please wait <span id='countdown'>$minutes" . "m " . "$seconds" . "s</span>.";
-    } else {
-        // No lock, proceed with login attempt
-        $email = trim($_POST['email']);
-        $password = $_POST['password']; // Plain text password submitted by user
-
-        // Use prepared statements for secure querying
-        $stmt = $conn->prepare("SELECT user_id, name, password, role FROM users WHERE email = ?");
+// Changed from INNER JOIN to LEFT JOIN so all ingredients are displayed
+// even if they don't have a matching entry in the inventory table
+$sql = "SELECT 
+            i.ingredient_name, 
+            i.quantity, 
+            i.unit, 
+            i.category, 
+            COALESCE(inv.low_stock_level, 10) as low_stock_level 
+        FROM ingredients i
+        LEFT JOIN inventory inv ON i.ingredient_name = inv.ingredient_name 
+        ORDER BY i.ingredient_name ASC";
         
-        if ($stmt) {
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $result = $stmt->get_result();
+$result = null;
+$inventory_items = [];
 
-            if ($result->num_rows === 1) {
-                $user = $result->fetch_assoc();
-                $stored_hash = $user['password']; // This is the HASH from the database
-                $user_role = $user['role'];      // Retrieve the user's role
-
-                // Use password_verify() to check the plain password against the hash
-                if (password_verify($password, $stored_hash)) {
-                    // SUCCESSFUL LOGIN
-                    
-                    // Reset failure counters
-                    $_SESSION['login_attempts'] = 0;
-                    $_SESSION['login_lock_expires'] = 0; 
-                    
-                    // Set session variables
-                    $_SESSION['user_id'] = $user['user_id'];
-                    $_SESSION['name'] = $user['name']; 
-                    $_SESSION['role'] = $user_role; // Store the role in the session
-                    
-                    // Conditional Redirect based on role
-                    if ($user_role === 'admin') {
-                        header('Location: admin/dashboard.php'); 
-                    } else {
-                        header('Location: index.php'); 
-                    }
-                    exit(); 
-                } else {
-                    // FAILED LOGIN: Password does not match hash
-                    $error = "Invalid email or password.";
-                    $_SESSION['login_attempts']++; 
-                }
-            } else {
-                // FAILED LOGIN: User not found
-                $error = "Invalid email or password.";
-                $_SESSION['login_attempts']++; 
-            }
-            $stmt->close();
-        } else {
-            // Database preparation error
-            $error = "A system error occurred. Please try again later.";
+if (isset($conn) && $conn->ping()) {
+    $result = $conn->query($sql);
+    if ($result && $result->num_rows > 0) {
+        while($row = $result->fetch_assoc()) {
+            $inventory_items[] = $row;
         }
+    }
+} else {
+    error_log("Database connection failed or is not available.");
+}
 
-        // 4. RATE LIMITING CHECK AFTER ATTEMPT
-        if ($_SESSION['login_attempts'] >= $max_attempts) {
-            $_SESSION['login_lock_expires'] = time() + $lockout_duration;
-            $error = "Too many failed attempts. You are locked out for 2 minutes. Please wait <span id='countdown'>02m 00s</span>.";
-        }
+// Function to determine stock status (UNMODIFIED)
+function get_stock_status($current_stock, $low_stock_level) {
+    if (!is_numeric($current_stock) || !is_numeric($low_stock_level) || $low_stock_level <= 0) {
+        return ['class' => 'good', 'text' => 'GOOD'];
+    }
+    if ($current_stock <= ($low_stock_level * 0.25)) {
+        return ['class' => 'critical', 'text' => 'CRITICAL - REORDER'];
+    } 
+    elseif ($current_stock <= $low_stock_level) { 
+        return ['class' => 'low', 'text' => 'LOW - ORDER SOON'];
+    } 
+    else {
+        return ['class' => 'good', 'text' => 'GOOD'];
     }
 }
 
-// Pass the lock expiry time to the JavaScript for countdown display
-$js_lock_expires = isset($_SESSION['login_lock_expires']) ? $_SESSION['login_lock_expires'] : 0;
+// Function to format category (UNMODIFIED)
+function format_category($db_category) {
+    switch ($db_category) {
+        case 'beans': return 'Coffee Beans & Ground';
+        case 'dairy': return 'Dairy & Milk Alternatives';
+        case 'syrups': return 'Syrups & Flavorings';
+        case 'pastry': return 'Baking & Pastry';
+        case 'tea': return 'Tea';
+        case 'other': return 'Add-Ons & Other';
+        default: return 'Uncategorized';
+    }
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - UNLI MAMI SYSTEM</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-</head>
+    <title>Inventory - Coffee Shop</title>
+    <link rel="stylesheet" href="../assets/css/inventory.css">
+    <link rel="stylesheet" href="../assets/css/navbar.css">
+    <link rel="icon" type="image/x-icon" href="https://scontent.fmnl17-3.fna.fbcdn.net/v/t1.15752-9/476133121_944707607784720_4222766298493625099_n.jpg?stp=dst-jpg_s100x100_tt6&_nc_cat=106&ccb=1-7&_nc_sid=029a7d&_nc_eui2=AeHbXTSveWEb4OzutQZJ0bo9taI_vWM-p1y1oj-9Yz6nXI0YaxhtxRPTLLJMJmHWtmHktAjCfAJasIl2dW9Xd5I&_nc_ohc=fujV-m1DLokQ7kNvwHfDq8g&_nc_oc=AdnbzmRf6BknvCWet4iFs18szBlKvHfOLnwPvF_Yz5vVNGXwjWsteEaM2u43sPz8450&_nc_zt=23&_nc_ht=scontent.fmnl17-3.fna&oh=03_Q7cD3gGJjWr_65WSg0tvi9N-0vVvuMYVYKORJ-0c42fXu4VQIg&oe=69191A0E">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    </head>
 <body>
 
-    <div class="main-container">
-        <form class="form" action="" method="POST">
-            <div class="form-header">
-                <h2>Welcome Back!</h2>
-                <p>Login to your account</p>
+    <div class="page-container">
+        <header class="main-header">
+            <div class="logo">
+                <i class="fas fa-coffee"></i>
             </div>
-
-            <?php if (!empty($error)): ?>
-                <p id="error-message" style="color: red; text-align:center;"><?php echo $error; ?></p>
-            <?php endif; ?>
-
-            <div class="form-group">
-                <label for="email">Email or Username</label>
-                <input type="email" id="email" name="email" placeholder="Enter your email" required>
-            </div>
-
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="Enter your password" required>
-            </div>
-
-            <div class="form-options">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="remember-me" name="remember-me">
-                    <label for="remember-me">Remember me</label>
-                </div>
-                <a href="forgotpassword.php" class="forgot-password">Forgot password?</a>
-            </div>
-
-            <button type="submit" name="login" id="login-btn">Log In</button>
-
-            <div class="form-footer">
-                <p>Don't have an account? <a href="signup.php">Sign Up</a></p>
-            </div>
-        </form>
-    </div>
-
-    <script>
-    // Pass the lock expiry timestamp to JavaScript
-    window.LOGIN_LOCK_EXPIRES = <?php echo $js_lock_expires; ?>;
-
-    // If server provided a lock expiry timestamp, run a countdown
-    if (typeof window.LOGIN_LOCK_EXPIRES !== 'undefined' && window.LOGIN_LOCK_EXPIRES > 0) {
-        function pad(n) { return n < 10 ? '0' + n : n; }
-        const countdownEl = document.getElementById('countdown');
-        const loginBtn = document.getElementById('login-btn');
-        const errorMsg = document.getElementById('error-message');
-        let timer;
-
-        function updateCountdown() {
-            const now = Math.floor(Date.now() / 1000);
-            let remaining = window.LOGIN_LOCK_EXPIRES - now;
             
-            if (remaining <= 0) {
-                // Lock expired: enable button and show success message
-                if (errorMsg) {
-                    errorMsg.style.color = 'green';
-                    errorMsg.innerHTML = 'You can now login again. Please try logging in.';
-                }
+            <nav class="main-nav" id="main-nav">
+                <ul>
+                    <li><a href="dashboard.php" class="nav-link active">DASHBOARD</a></li>
+                    <li><a href="adminorders.php" class="nav-link">ORDER</a></li>
+                    <li><a href="inventory.php" class="nav-link">INVENTORY</a></li>
+                    <li><a href="products.php" class="nav-link">PRODUCTS</a></li>
+                    <li><a href="feedbacks.php" class="nav-link">FEEDBACK & REVIEW</a></li>                    
+                    <li class="mobile-logout">
+                        <a href="../login.php" class="nav-link logout-button-mobile">LOGOUT</a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="header-actions">
+                <a href="../login.php" class="logout-button">LOGOUT</a>
                 
-                if (loginBtn) {
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = 'Log In';
-                }
-                if (timer) clearInterval(timer);
-                return;
-            }
+                <div class="burger-menu" id="burger-menu">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                
+                <img src="https://scontent.fmnl17-3.fna.fbcdn.net/v/t1.15752-9/476133121_944707607784720_4222766298493625099_n.jpg?stp=dst-jpg_s100x100_tt6&_nc_cat=106&ccb=1-7&_nc_sid=029a7d&_nc_eui2=AeHbXTSveWEb4OzutQZJ0bo9taI_vWM-p1y1oj-9Yz6nXI0YaxhtxRPTLLJMJmHWtmHktAjCfAJasIl2dW9Xd5mI&_nc_ohc=fujV-m1DLokQ7kNvwHfDq8g&_nc_oc=AdnbzmRf6BknvCWet4iFs18szBlKvHfOLnwPvF_Yz5vVNGXwjWsteEaM2u43sPz8450&_nc_zt=23&_nc_ht=scontent.fmnl17-3.fna&oh=03_Q7cD3gGJjWr_65WSg0tvi9N-0vVvuMYVYKORJ-0c42fXu4VQIg&oe=69191A0E" alt="User Profile" class="profile-image">
+                <div class="cart-icon">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span class="cart-badge">3</span>
+                </div>
+            </div>
+        </header>
 
-            const mins = Math.floor(remaining / 60);
-            const secs = remaining % 60;
+        <main class="inventory-management">
+            <h1 class="page-title">INVENTORY MANAGEMENT</h1>
             
-            if (countdownEl) countdownEl.textContent = pad(mins) + 'm ' + pad(secs) + 's';
-            if (loginBtn) {
-                loginBtn.disabled = true;
-                loginBtn.textContent = 'Locked';
-            }
-        }
+            <div class="inventory-card">
+                <div class="search-and-filter">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="search-input" placeholder="Search by name...">
+                    </div>
+                    <div class="category-filter">
+                        <select id="category-filter-select">
+                            <option value="">All Categories</option>
+                            <option value="beans">Coffee Beans & Ground</option>
+                            <option value="dairy">Dairy & Milk Alternatives</option>
+                            <option value="syrups">Syrups & Flavorings</option>
+                            <option value="pastry">Baking & Pastry</option>
+                            <option value="tea">Tea</option>
+                            <option value="other">Add-Ons & Other</option>
+                        </select>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                
+                <form action="handle_inventory_update.php" method="POST" id="inventory-update-form">
 
-        // Initialize the countdown on page load if the lock is active
-        if (window.LOGIN_LOCK_EXPIRES > Math.floor(Date.now() / 1000)) {
-            updateCountdown();
-            timer = setInterval(updateCountdown, 1000);
-        }
-    }
+                    <div class="table-responsive">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-name">NAME</th>
+                                    <th>CATEGORY</th>
+                                    <th>UPDATE STOCK</th>
+                                    <th>PAR LEVEL (Reorder Point)</th>
+                                    <th class="col-status">STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                if (!empty($inventory_items)) {
+                                    foreach ($inventory_items as $item) {
+                                        $name = $item['ingredient_name'];
+                                        $current_stock = $item['quantity'];
+                                        $unit = $item['unit'];
+                                        $par_level = $item['low_stock_level']; 
+                                        $category = $item['category']; 
+                                        
+                                        $status = get_stock_status($current_stock, $par_level);
+
+                                        $display_category = format_category($category); 
+                                        $display_par_level = htmlspecialchars($par_level) . ' ' . htmlspecialchars($unit); 
+                                        
+                                        // Sanitize ingredient name for use in HTML attributes
+                                        $ingredient_name_safe = htmlspecialchars($name);
+                                        $original_quantity = htmlspecialchars($current_stock); // Used for reset button
+
+                                        echo "<tr class='item-row' data-category='" . htmlspecialchars($category) . "'>";
+                                        echo "<td class='item-name'>" . $ingredient_name_safe . "</td>";
+                                        echo "<td>" . $display_category . "</td>"; 
+                                        
+                                        // --- NEW STOCK CONTROL CELL ---
+                                        echo "<td>";
+                                        echo "  <div class='stock-controls' data-original='" . $original_quantity . "'>";
+                                        // Decrement Button
+                                        echo "      <button type='button' class='decrement-btn' data-step='1'>-</button>";
+                                        // Quantity Input Field (name=updates[Ingredient Name] to send as a batch array)
+                                        echo "      <input type='number' name='updates[" . $ingredient_name_safe . "]' value='" . $original_quantity . "' step='any' min='0' class='stock-input'>";
+                                        // Increment Button
+                                        echo "      <button type='button' class='increment-btn' data-step='1'>+</button>";
+                                        // Reset/Correction Button
+                                        echo "      <button type='button' class='reset-btn' title='Reset to original'><i class='fas fa-undo-alt'></i></button>";
+                                        // Unit Display
+                                        echo "      <span class='unit-display'>" . htmlspecialchars($unit) . "</span>";
+                                        echo "  </div>";
+                                        echo "</td>";
+                                        // --- END NEW STOCK CONTROL CELL ---
+                                        
+                                        echo "<td>" . $display_par_level . "</td>";
+                                        echo "<td class='status-cell'>";
+                                        echo "<span class='status-badge " . $status['class'] . "'>" . $status['text'] . "</span>";
+                                        echo "</td>";
+                                        echo "</tr>";
+                                    }
+                                } else {
+                                    echo "<tr><td colspan='5' style='text-align: center; color: #cc3333; padding: 10px;'>No inventory items found. Check your database connection and ingredients table.</td></tr>";
+                                }
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <button type="submit" class="save-all-changes-btn">
+                        <i class="fas fa-save"></i> SAVE ALL CHANGES
+                    </button>
+                </form>
+                </div>
+
+            <div class="low-stock-alerts">
+                <h3 class="alerts-title">LOW STOCK ALERTS:</h3>
+                <p>
+                    <?php
+                    $low_stock_names = [];
+                    foreach ($inventory_items as $item) {
+                        $current_stock = $item['quantity'];
+                        $par_level = $item['low_stock_level'];
+                        $status = get_stock_status($current_stock, $par_level);
+                        if ($status['class'] === 'critical' || $status['class'] === 'low') {
+                            $low_stock_names[] = $item['ingredient_name'];
+                        }
+                    }
+                    if (!empty($low_stock_names)) {
+                        echo htmlspecialchars(implode(', ', $low_stock_names));
+                    } else {
+                        echo "All stock levels are good.";
+                    }
+                    ?>
+                </p>
+            </div>
+        </main>
+
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // --- COMBINED FILTER/SEARCH LOGIC (UNMODIFIED) ---
+            const categorySelect = document.getElementById('category-filter-select');
+            const searchInput = document.getElementById('search-input');
+            const tableRows = document.querySelectorAll('.inventory-table tbody tr');
+
+            function applyFilters() {
+                const selectedCategory = categorySelect.value;
+                const searchTerm = searchInput.value.toLowerCase();
+
+                tableRows.forEach(row => {
+                    const rowCategory = row.getAttribute('data-category');
+                    const ingredientName = row.querySelector('.item-name').textContent.toLowerCase(); 
+
+                    const passesCategory = (selectedCategory === '' || rowCategory === selectedCategory);
+                    const passesSearch = (ingredientName.includes(searchTerm));
+
+                    if (passesCategory && passesSearch) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            }
+
+            categorySelect.addEventListener('change', applyFilters);
+            searchInput.addEventListener('keyup', applyFilters); 
+            // --- END COMBINED FILTER/SEARCH LOGIC ---
+
+
+            // --- NEW STOCK CONTROL LOGIC (INCREMENT/DECREMENT/RESET) ---
+            const stockControls = document.querySelectorAll('.stock-controls');
+
+            stockControls.forEach(controlDiv => {
+                const input = controlDiv.querySelector('.stock-input');
+                const originalValue = parseFloat(controlDiv.getAttribute('data-original'));
+                
+                // 1. Decrement Button (-)
+                controlDiv.querySelector('.decrement-btn').addEventListener('click', function() {
+                    let currentValue = parseFloat(input.value);
+                    if (!isNaN(currentValue) && currentValue > 0) {
+                        // Decrement by 1, but don't go below zero
+                        input.value = Math.max(0, currentValue - 1);
+                    }
+                });
+
+                // 2. Increment Button (+)
+                controlDiv.querySelector('.increment-btn').addEventListener('click', function() {
+                    let currentValue = parseFloat(input.value);
+                    if (isNaN(currentValue)) {
+                        currentValue = 0;
+                    }
+                    // Increment by 1
+                    input.value = currentValue + 1;
+                });
+
+                // 3. Reset Button (Circular Arrow)
+                controlDiv.querySelector('.reset-btn').addEventListener('click', function() {
+                    // Reset the input value to the quantity pulled from the database
+                    input.value = originalValue;
+                });
+
+                // Optional: Force input to a non-negative number on change
+                input.addEventListener('change', function() {
+                    let currentValue = parseFloat(input.value);
+                    if (isNaN(currentValue) || currentValue < 0) {
+                        input.value = 0;
+                    }
+                });
+            });
+        });
     </script>
+    <script src="assets/js/Navbar.js"></script>
 </body>
 </html>
